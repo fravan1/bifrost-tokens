@@ -1,0 +1,10 @@
+src/=src/
+forge-std/=lib/forge-std/src/
+lz/=lib/solidity-examples/contracts/
+ds-test/=lib/openzeppelin-contracts-upgradeable/lib/forge-std/lib/ds-test/src/
+erc4626-tests/=lib/openzeppelin-contracts-upgradeable/lib/erc4626-tests/
+openzeppelin-contracts-upgradeable/=lib/openzeppelin-contracts-upgradeable/
+openzeppelin-contracts/=lib/openzeppelin-contracts/
+openzeppelin/=lib/openzeppelin-contracts-upgradeable/contracts/
+solidity-examples/=lib/solidity-examples/contracts/
+@openzeppelin/=lib/openzeppelin-contracts/

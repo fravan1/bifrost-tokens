@@ -147,7 +147,8 @@ contract Vault is UUPSUpgradeable, ReentrancyGuardUpgradeable, NonblockingLzApp 
 
         amount = _safeTransferFrom(token, _msgSender(), address(this), amount);
 
-        bytes memory _payload = abi.encode(token, _msgSender(), amount);
+        address l2Token = $.tokenPairs[token];
+        bytes memory _payload = abi.encode(l2Token, _msgSender(), amount);
         _adapterParams = _adapterParams.length > 2 ? _adapterParams : $.defaultAdapterParams;
         _lzSend($.destinationChainId, _payload, payable(_msgSender()), address(0x0), _adapterParams, msg.value);
         emit BridgeToken(token, amount);
@@ -170,15 +171,14 @@ contract Vault is UUPSUpgradeable, ReentrancyGuardUpgradeable, NonblockingLzApp 
         bytes memory _payload
     ) internal override whenNotPaused {
         // decode the token transfer payload
-        (address dstToken, address recipient, uint256 amount) = abi.decode(_payload, (address, address, uint256));
+        (address l2Token, address recipient, uint256 amount) = abi.decode(_payload, (address, address, uint256));
 
         VaultStorage storage $ = _getVaultStorage();
 
         if ($.destinationChainId != _srcChainId) revert InvalidSourceChain();
 
-        address token = $.tokenPairs[dstToken];
-
-        if (!$.whitelisted[token]) revert TokenNotAllowed();
+        address token = $.tokenPairs[l2Token];
+        if (token == address(0) && !$.whitelisted[token]) revert TokenNotAllowed();
 
         IERC20(token).safeTransfer(recipient, amount);
         emit TokenClaimed(token, recipient, amount);

@@ -117,20 +117,21 @@ contract TokenController is UUPSUpgradeable, ReentrancyGuardUpgradeable, Nonbloc
         emit TokenClaimed(_srcChainId, token, recipient, amount);
     }
 
-    function bridgeToken(uint16 dstChainId, address token, uint256 amount, bytes memory _adapterParams)
+    function bridgeToken(uint16 dstChainId, address l2Token, uint256 amount, bytes memory _adapterParams)
         external
         payable
         whenNotPaused
     {
-        // burn token from user
-        IMintableERC20(token).burn(_msgSender(), amount);
-
         ControllerStorage storage $ = _getControllerStorage();
+        if (!$.whitelisted[l2Token]) revert TokenNotAllowed();
+
+        // burn token from user
+        IMintableERC20(l2Token).burn(_msgSender(), amount);
 
         // send lz message
-        bytes memory _payload = abi.encode(token, _msgSender(), amount);
+        bytes memory _payload = abi.encode(l2Token, _msgSender(), amount);
         _adapterParams = _adapterParams.length > 2 ? _adapterParams : $.defaultAdapterParams;
         _lzSend(dstChainId, _payload, payable(_msgSender()), address(0x0), _adapterParams, msg.value);
-        emit BridgeToken(token, amount);
+        emit BridgeToken(l2Token, amount);
     }
 }

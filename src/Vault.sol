@@ -23,7 +23,7 @@ contract Vault is UUPSUpgradeable, ReentrancyGuardUpgradeable, NonblockingLzApp 
     }
 
     // keccak256(abi.encode(uint256(keccak256("real.storage.Vault")) - 1)) & ~bytes32(uint256(0xff))
-    bytes32 private constant VaultStorageLocation = 0x38dd9414040caa499e6f8618dea3a4643d21426b03e08452c6a0e2c3bb47f300;
+    bytes32 private constant VaultStorageLocation = 0xb6416d507a04e2a32445de45abf7290bf3bbe8e9fa76203447827b6ceacc5300;
 
     function _getVaultStorage() private pure returns (VaultStorage storage $) {
         // slither-disable-next-line assembly
@@ -36,6 +36,7 @@ contract Vault is UUPSUpgradeable, ReentrancyGuardUpgradeable, NonblockingLzApp 
     event Whitelisted(address indexed srcToken, address indexed dstToken, bool isWhitelisted);
     event BridgeToken(address indexed token, uint256 amount);
     event TokenClaimed(address indexed token, address indexed receiver, uint256 amount);
+    event TokenRescued(address indexed token, address indexed receiver, uint256 amount);
     event UpdateLzAdapterParams(uint256 limit);
     event Paused(bool isPaused);
 
@@ -56,13 +57,8 @@ contract Vault is UUPSUpgradeable, ReentrancyGuardUpgradeable, NonblockingLzApp 
     /**
      * @notice Vault initializer
      * @param _admin The admin address
-     * @param _manager The manager address
      */
-    function initialize(address _admin, address _manager, uint16 _dstChainId) external initializer {
-        if (_manager == address(0)) {
-            revert ZeroAddress();
-        }
-
+    function initialize(address _admin, uint16 _dstChainId) external initializer {
         if (_dstChainId == 0) {
             revert InvalidParam();
         }
@@ -143,13 +139,8 @@ contract Vault is UUPSUpgradeable, ReentrancyGuardUpgradeable, NonblockingLzApp 
     }
 
     function bridgeToken(address token, uint256 amount, bytes memory _adapterParams) external payable whenNotPaused {
-        if (token == address(0)) {
-            revert ZeroAddress();
-        }
-
-        if (amount == 0) {
-            revert InvalidParam();
-        }
+        if (token == address(0)) revert ZeroAddress();
+        if (amount == 0) revert InvalidParam();
 
         VaultStorage storage $ = _getVaultStorage();
         if (!$.whitelisted[token]) revert TokenNotAllowed();
@@ -160,6 +151,11 @@ contract Vault is UUPSUpgradeable, ReentrancyGuardUpgradeable, NonblockingLzApp 
         _adapterParams = _adapterParams.length > 2 ? _adapterParams : $.defaultAdapterParams;
         _lzSend($.destinationChainId, _payload, payable(_msgSender()), address(0x0), _adapterParams, msg.value);
         emit BridgeToken(token, amount);
+    }
+
+    function rescueToken(address token, address to, uint256 amount) external onlyOwner {
+        IERC20(token).safeTransfer(to, amount);
+        emit TokenRescued(token, to, amount);
     }
 
     // ======================= INTERNAL =======================

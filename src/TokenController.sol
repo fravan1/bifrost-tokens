@@ -22,7 +22,7 @@ contract TokenController is UUPSUpgradeable, ReentrancyGuardUpgradeable, Nonbloc
 
     // keccak256(abi.encode(uint256(keccak256("real.storage.Controller")) - 1)) & ~bytes32(uint256(0xff))
     bytes32 private constant ControllerStorageLocation =
-        0x38dd9414040caa499e6f8618dea3a4643d21426b03e08452c6a0e2c3bb47f300;
+        0xa42e995bc2ea3f08c0d30976851f7745a056162abe03e339fd26a9a9c58a5a00;
 
     function _getControllerStorage() private pure returns (ControllerStorage storage $) {
         // slither-disable-next-line assembly

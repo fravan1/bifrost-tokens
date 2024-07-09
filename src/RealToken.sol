@@ -3,25 +3,46 @@
 pragma solidity =0.8.21;
 
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
-import "@openzeppelin/contracts/access/AccessControl.sol";
+import "@openzeppelin/contracts/access/Ownable2Step.sol";
 import "@openzeppelin/contracts/token/ERC20/extensions/ERC20Permit.sol";
 
-contract RealToken is ERC20, AccessControl, ERC20Permit {
-    // for all controller access (mint, burn)
-    bytes32 constant CONTROLLER_ROLE = keccak256("CONTROLLER_ROLE");
+contract RealToken is ERC20, ERC20Permit, Ownable2Step {
+    uint8 private immutable _decimals;
+    address public controller;
 
-    uint8 private _decimals;
+    event UpdateController(address indexed oldContorller, address indexed newController);
 
-    constructor(address defaultAdmin, string memory name_, string memory symbol_, uint8 decimals_)
+    /**
+     * @dev The caller account is not authorized to perform an operation.
+     */
+    error ConrollereUnauthorizedAccount(address account);
+
+    constructor(address intialOwner, string memory name_, string memory symbol_, uint8 decimals_)
         ERC20(name_, symbol_)
         ERC20Permit(name_)
+        Ownable(intialOwner)
     {
-        _grantRole(DEFAULT_ADMIN_ROLE, defaultAdmin);
-
         _decimals = decimals_;
     }
 
-    function _beforeTokenTransfer(address from, address to, uint256 amount) internal override(ERC20) {}
+    /**
+     * @dev Throws if called by any account other than the owner.
+     */
+    modifier onlyController() {
+        _checkController();
+        _;
+    }
+
+    function _checkController() internal view {
+        if (controller != _msgSender()) {
+            revert ConrollereUnauthorizedAccount(_msgSender());
+        }
+    }
+
+    function setController(address _controller) external onlyOwner {
+        emit UpdateController(controller, _controller);
+        controller = _controller;
+    }
 
     /**
      * @dev Returns the number of decimals used to get its user representation.
@@ -40,11 +61,11 @@ contract RealToken is ERC20, AccessControl, ERC20Permit {
         return _decimals;
     }
 
-    function burn(address user_, uint256 amount_) external onlyRole(CONTROLLER_ROLE) {
+    function burn(address user_, uint256 amount_) external onlyController {
         _burn(user_, amount_);
     }
 
-    function mint(address receiver_, uint256 amount_) external onlyRole(CONTROLLER_ROLE) {
+    function mint(address receiver_, uint256 amount_) external onlyController {
         _mint(receiver_, amount_);
     }
 }

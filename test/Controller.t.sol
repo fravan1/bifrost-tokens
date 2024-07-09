@@ -37,15 +37,22 @@ contract ControllerTest is Test {
         controllerProxy = TokenController(address(proxy));
 
         vm.startPrank(admin.addr);
-
         // set controller in token
-        usdc.grantRole(keccak256("CONTROLLER_ROLE"), address(controllerProxy));
-
+        usdc.setController(address(controllerProxy));
         // set crosschain config
         controllerProxy.setWhitelistToken(address(usdc));
         bytes memory path = abi.encodePacked(address(controllerProxy), address(controllerProxy));
         controllerProxy.setTrustedRemote(remoteChainId, path);
         vm.stopPrank();
+    }
+
+    function test_TokenName() public view {
+        assertEq(usdc.name(), "USD Coin");
+        assertEq(usdc.symbol(), "USDC.e");
+    }
+
+    function test_TokenDecimals() public view {
+        assertEq(usdc.decimals(), 6);
     }
 
     function test_FailBridgeTokenFromL2() public {
@@ -54,7 +61,7 @@ contract ControllerTest is Test {
         deal(address(usdc), alice.addr, bridgeAmount);
         deal(alice.addr, 2 ether);
         vm.expectRevert(TokenController.TokenNotAllowed.selector);
-        controllerProxy.bridgeToken{value: 0.1 ether}(remoteChainId, usdt, bridgeAmount, "0x");
+        controllerProxy.bridgeToken{value: 0.1 ether}(remoteChainId, usdt, bridgeAmount, "");
         vm.stopPrank();
     }
 
@@ -66,13 +73,13 @@ contract ControllerTest is Test {
 
         assertEq(IERC20(usdc).balanceOf(alice.addr), bridgeAmount);
 
-        controllerProxy.bridgeToken{value: 0.1 ether}(remoteChainId, address(usdc), bridgeAmount, "0x");
+        controllerProxy.bridgeToken{value: 0.1 ether}(remoteChainId, address(usdc), bridgeAmount, "");
         vm.stopPrank();
 
         assertEq(IERC20(usdc).balanceOf(alice.addr), 0);
     }
 
-    function test_FailLzRecive() public {
+    function test_FailLzReciveL2() public {
         uint256 bridgeAmount = 100_000_000;
         deal(address(usdc), alice.addr, bridgeAmount);
 
@@ -87,7 +94,20 @@ contract ControllerTest is Test {
         assertNotEq(controllerProxy.failedMessages(remoteChainId, _srcAddress, 1), msg0x);
     }
 
-    function test_LzReceive() public {
+    function test_FailLzReciveL2Sender() public {
+        uint256 bridgeAmount = 100_000_000;
+        deal(address(usdc), alice.addr, bridgeAmount);
+
+        bytes memory _srcAddress = abi.encodePacked(address(controllerProxy), address(controllerProxy));
+        bytes memory _payload = abi.encode(usdc, alice.addr, bridgeAmount);
+
+        vm.startPrank(alice.addr);
+        vm.expectRevert();
+        controllerProxy.lzReceive(remoteChainId, _srcAddress, 1, _payload);
+        vm.stopPrank();
+    }
+
+    function test_LzReceiveL2() public {
         uint256 bridgeAmount = 100_000_000;
         assertEq(IERC20(usdc).balanceOf(alice.addr), 0);
 

@@ -3,18 +3,19 @@ pragma solidity =0.8.21;
 
 import {UUPSUpgradeable} from "openzeppelin-contracts-upgradeable/contracts/proxy/utils/UUPSUpgradeable.sol";
 import {ReentrancyGuardUpgradeable} from
-    "openzeppelin-contracts-upgradeable/contracts/security/ReentrancyGuardUpgradeable.sol";
-import {NonblockingLzApp} from "lz/lzApp/NonblockingLzApp.sol";
+    "openzeppelin-contracts-upgradeable/contracts/utils/ReentrancyGuardUpgradeable.sol";
+import {NonblockingLzAppUpgradeable} from "@tangible/layerzero/lzApp/NonblockingLzAppUpgradeable.sol";
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
-contract Vault is UUPSUpgradeable, ReentrancyGuardUpgradeable, NonblockingLzApp {
+contract Vault is UUPSUpgradeable, ReentrancyGuardUpgradeable, NonblockingLzAppUpgradeable {
     using SafeERC20 for IERC20;
+
+    uint16 immutable destinationChainId;
 
     /// @custom:storage-location erc7201:real.storage.Vault
     struct VaultStorage {
-        uint16 destinationChainId;
         bytes defaultAdapterParams;
         bool paused;
         mapping(address => bool) whitelisted;
@@ -52,31 +53,27 @@ contract Vault is UUPSUpgradeable, ReentrancyGuardUpgradeable, NonblockingLzApp 
      * @param endpoint The endpoint for Layer Zero operations.
      * @custom:oz-upgrades-unsafe-allow constructor
      */
-    constructor(address endpoint) NonblockingLzApp(endpoint) {}
+    constructor(address endpoint, uint16 dstChainId) NonblockingLzAppUpgradeable(endpoint) {
+        destinationChainId = dstChainId;
+    }
 
     /**
      * @notice Vault initializer
-     * @param _admin The admin address
+     * @param intialOwner The admin address
      */
-    function initialize(address _admin, uint16 _dstChainId) external initializer {
-        if (_dstChainId == 0) {
-            revert InvalidParam();
-        }
-
+    function initialize(address intialOwner) external initializer {
         __UUPSUpgradeable_init();
         __ReentrancyGuard_init();
-
-        _transferOwnership(_admin);
+        __NonblockingLzApp_init(intialOwner);
 
         // Set storage
         VaultStorage storage $ = _getVaultStorage();
-        $.destinationChainId = _dstChainId;
         $.defaultAdapterParams = abi.encodePacked(uint16(1), uint256(200_000)); //set layerZero adapter params for native fees
     }
 
     /**
-     * @dev The L1DaiEscrow can only be upgraded by the owner
-     * @param v new L1DaiEscrow implementation
+     * @dev The Vault can only be upgraded by the owner
+     * @param v new Vault implementation
      */
     function _authorizeUpgrade(address v) internal override onlyOwner {}
 
@@ -85,7 +82,7 @@ contract Vault is UUPSUpgradeable, ReentrancyGuardUpgradeable, NonblockingLzApp 
      *
      * Requirements:
      *
-     * - The contract must be paused.
+     * - The contract must not be paused.
      */
     modifier whenNotPaused() {
         VaultStorage storage $ = _getVaultStorage();
@@ -102,7 +99,7 @@ contract Vault is UUPSUpgradeable, ReentrancyGuardUpgradeable, NonblockingLzApp 
      *
      * - The contract must not be paused.
      */
-    function togglePause() internal virtual {
+    function togglePause() external onlyOwner {
         VaultStorage storage $ = _getVaultStorage();
         bool state = $.paused;
         $.paused = !state;
@@ -110,7 +107,7 @@ contract Vault is UUPSUpgradeable, ReentrancyGuardUpgradeable, NonblockingLzApp 
     }
 
     function setWhitelistToken(address srcToken, address dstToken) external onlyOwner {
-        if (srcToken == address(0) && dstToken == address(0)) revert ZeroAddress();
+        if (srcToken == address(0) || dstToken == address(0)) revert ZeroAddress();
 
         VaultStorage storage $ = _getVaultStorage();
         $.whitelisted[srcToken] = true;
@@ -127,7 +124,7 @@ contract Vault is UUPSUpgradeable, ReentrancyGuardUpgradeable, NonblockingLzApp 
 
         $.whitelisted[srcToken] = false;
         $.tokenPairs[srcToken] = address(0);
-        if (dstToken != address(0)) $.tokenPairs[dstToken] = address(0);
+        $.tokenPairs[dstToken] = address(0);
         emit Whitelisted(srcToken, address(0), false);
     }
 
@@ -149,8 +146,8 @@ contract Vault is UUPSUpgradeable, ReentrancyGuardUpgradeable, NonblockingLzApp 
 
         address l2Token = $.tokenPairs[token];
         bytes memory _payload = abi.encode(l2Token, _msgSender(), amount);
-        _adapterParams = _adapterParams.length > 2 ? _adapterParams : $.defaultAdapterParams;
-        _lzSend($.destinationChainId, _payload, payable(_msgSender()), address(0x0), _adapterParams, msg.value);
+        _adapterParams = _adapterParams.length != 0 ? _adapterParams : $.defaultAdapterParams;
+        _lzSend(destinationChainId, _payload, payable(_msgSender()), address(0x0), _adapterParams, msg.value);
         emit BridgeToken(token, amount);
     }
 
@@ -161,7 +158,7 @@ contract Vault is UUPSUpgradeable, ReentrancyGuardUpgradeable, NonblockingLzApp 
 
     // ======================= INTERNAL =======================
 
-    /// @dev Internal function to handle incoming Ping messages.
+    /// @dev Internal function to handle incoming token unlock message.
     /// @param _srcChainId The source chain ID from which the message originated.
     /// @param _payload The payload of the incoming message.
     function _nonblockingLzReceive(
@@ -175,10 +172,10 @@ contract Vault is UUPSUpgradeable, ReentrancyGuardUpgradeable, NonblockingLzApp 
 
         VaultStorage storage $ = _getVaultStorage();
 
-        if ($.destinationChainId != _srcChainId) revert InvalidSourceChain();
+        if (destinationChainId != _srcChainId) revert InvalidSourceChain();
 
         address token = $.tokenPairs[l2Token];
-        if (token == address(0) && !$.whitelisted[token]) revert TokenNotAllowed();
+        if (token == address(0) || !$.whitelisted[token]) revert TokenNotAllowed();
 
         IERC20(token).safeTransfer(recipient, amount);
         emit TokenClaimed(token, recipient, amount);
@@ -198,10 +195,5 @@ contract Vault is UUPSUpgradeable, ReentrancyGuardUpgradeable, NonblockingLzApp 
     function getDefaultLZParam() public view returns (bytes memory) {
         VaultStorage storage $ = _getVaultStorage();
         return $.defaultAdapterParams;
-    }
-
-    function getDestinationChainId() public view returns (uint16) {
-        VaultStorage storage $ = _getVaultStorage();
-        return $.destinationChainId;
     }
 }

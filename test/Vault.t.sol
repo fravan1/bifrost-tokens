@@ -30,8 +30,8 @@ contract VaultTest is Test {
         admin = makeAccount("admin");
         alice = makeAccount("alice");
 
-        v1 = new Vault(arbEndPoint);
-        bytes memory vaultData = abi.encodeWithSelector(Vault.initialize.selector, admin.addr, remoteChainId);
+        v1 = new Vault(arbEndPoint, remoteChainId);
+        bytes memory vaultData = abi.encodeWithSelector(Vault.initialize.selector, admin.addr);
         UUPSProxy proxy = new UUPSProxy(address(v1), vaultData);
         vaultProxy = Vault(address(proxy));
 
@@ -63,7 +63,7 @@ contract VaultTest is Test {
         assertEq(IERC20(usdc).balanceOf(alice.addr), bridgeAmount);
 
         IERC20(usdc).approve(address(vaultProxy), bridgeAmount);
-        vaultProxy.bridgeToken{value: 0.1 ether}(usdc, bridgeAmount, "0x");
+        vaultProxy.bridgeToken{value: 0.1 ether}(usdc, bridgeAmount, "");
         vm.stopPrank();
         assertEq(IERC20(usdc).balanceOf(alice.addr), 0);
     }
@@ -80,6 +80,18 @@ contract VaultTest is Test {
 
         bytes32 msg0x;
         assertNotEq(vaultProxy.failedMessages(remoteChainId, _srcAddress, 1), msg0x);
+    }
+
+    function test_FailLzReciveSender() public {
+        uint256 bridgeAmount = 100_000_000;
+        deal(usdc, address(vaultProxy), bridgeAmount);
+        bytes memory _srcAddress = abi.encodePacked(address(vaultProxy), l2Controller);
+        bytes memory _payload = abi.encode(usdc, alice.addr, bridgeAmount);
+
+        vm.startPrank(alice.addr);
+        vm.expectRevert();
+        vaultProxy.lzReceive(remoteChainId, _srcAddress, 1, _payload);
+        vm.stopPrank();
     }
 
     function test_LzReceive() public {

@@ -3,14 +3,14 @@ pragma solidity =0.8.21;
 
 import {UUPSUpgradeable} from "openzeppelin-contracts-upgradeable/contracts/proxy/utils/UUPSUpgradeable.sol";
 import {ReentrancyGuardUpgradeable} from
-    "openzeppelin-contracts-upgradeable/contracts/security/ReentrancyGuardUpgradeable.sol";
-import {NonblockingLzApp} from "lz/lzApp/NonblockingLzApp.sol";
+    "openzeppelin-contracts-upgradeable/contracts/utils/ReentrancyGuardUpgradeable.sol";
+import {NonblockingLzAppUpgradeable} from "@tangible/layerzero/lzApp/NonblockingLzAppUpgradeable.sol";
 
 import {IMintableERC20} from "src/interfaces/IMintableERC20.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
-contract TokenController is UUPSUpgradeable, ReentrancyGuardUpgradeable, NonblockingLzApp {
+contract TokenController is UUPSUpgradeable, ReentrancyGuardUpgradeable, NonblockingLzAppUpgradeable {
     using SafeERC20 for IERC20;
 
     /// @custom:storage-location erc7201:real.storage.Controller
@@ -45,25 +45,24 @@ contract TokenController is UUPSUpgradeable, ReentrancyGuardUpgradeable, Nonbloc
      * @param endpoint The endpoint for Layer Zero operations.
      * @custom:oz-upgrades-unsafe-allow constructor
      */
-    constructor(address endpoint) NonblockingLzApp(endpoint) {}
+    constructor(address endpoint) NonblockingLzAppUpgradeable(endpoint) {}
 
     /**
      * @notice Vault initializer
-     * @param _admin The admin address
+     * @param intialOwner The admin address
      */
-    function initialize(address _admin) external initializer {
+    function initialize(address intialOwner) external initializer {
         __UUPSUpgradeable_init();
         __ReentrancyGuard_init();
-
-        _transferOwnership(_admin);
+        __NonblockingLzApp_init(intialOwner);
 
         ControllerStorage storage $ = _getControllerStorage();
         $.defaultAdapterParams = abi.encodePacked(uint16(1), uint256(200_000)); //set layerZero adapter params for native fees
     }
 
     /**
-     * @dev The L1DaiEscrow can only be upgraded by the owner
-     * @param v new L1DaiEscrow implementation
+     * @dev The Controller can only be upgraded by the owner
+     * @param v new Controller implementation
      */
     function _authorizeUpgrade(address v) internal override onlyOwner {}
 
@@ -72,12 +71,26 @@ contract TokenController is UUPSUpgradeable, ReentrancyGuardUpgradeable, Nonbloc
      *
      * Requirements:
      *
-     * - The contract must be paused.
+     * - The contract must not be paused.
      */
     modifier whenNotPaused() {
         ControllerStorage storage $ = _getControllerStorage();
         if ($.paused) revert IsPaused();
         _;
+    }
+
+    /**
+     * @dev Triggers stopped state.
+     *
+     * Requirements:
+     *
+     * - The contract must not be paused.
+     */
+    function togglePause() external onlyOwner {
+        ControllerStorage storage $ = _getControllerStorage();
+        bool state = $.paused;
+        $.paused = !state;
+        emit Paused(state);
     }
 
     function setWhitelistToken(address token) external onlyOwner {
@@ -130,7 +143,7 @@ contract TokenController is UUPSUpgradeable, ReentrancyGuardUpgradeable, Nonbloc
 
         // send lz message
         bytes memory _payload = abi.encode(l2Token, _msgSender(), amount);
-        _adapterParams = _adapterParams.length > 2 ? _adapterParams : $.defaultAdapterParams;
+        _adapterParams = _adapterParams.length != 0 ? _adapterParams : $.defaultAdapterParams;
         _lzSend(dstChainId, _payload, payable(_msgSender()), address(0x0), _adapterParams, msg.value);
         emit BridgeToken(l2Token, amount);
     }

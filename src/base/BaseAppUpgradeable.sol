@@ -120,6 +120,8 @@ abstract contract BaseAppUpgradeable is ReentrancyGuardUpgradeable, OwnableUpgra
         BaseAppStorage storage $ = _getBaseAppStorage();
         if (!$.whitelisted[token]) revert TokenNotAllowed();
 
+        _adapterParams = _adapterParams.length != 0 ? _adapterParams : $.defaultAdapterParams;
+
         _send(_dstChainId, token, amount, _adapterParams);
 
         emit BridgeToken(token, amount);

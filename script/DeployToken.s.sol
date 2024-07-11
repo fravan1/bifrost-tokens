@@ -7,7 +7,7 @@ import {RealToken} from "src/token/RealToken.sol";
 
 contract DeployToken is Script {
     address admin = 0x95e3664633A8650CaCD2c80A0F04fb56F65DF300;
-    address controller = 0x3B2d4FDc0E8a8E7aa414073287F07BbB1f6620ad;
+    address controller = 0x8B63F11141D998D45A50D6c7A51db217C2481E25;
 
     address _deployer;
 
@@ -26,7 +26,7 @@ contract DeployToken is Script {
         string memory symbol = "USDC";
         uint8 decimals = 6;
 
-        RealToken token = new RealToken(admin, name, symbol, decimals);
+        RealToken token = new RealToken{salt: keccak256(abi.encodePacked("real.usdc"))}(admin, name, symbol, decimals);
         token.setController(controller);
 
         return address(token);

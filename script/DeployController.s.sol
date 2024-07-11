@@ -26,7 +26,7 @@ contract DeployController is Script {
         controller = new TokenController(realLZEndpoint);
         bytes memory data = abi.encodeWithSelector(TokenController.initialize.selector, _deployer);
 
-        bytes32 salt = keccak256(bytes("real.Controller.v1"));
+        bytes32 salt = keccak256(bytes("real.bridge.controller"));
         bytes memory creationCode =
             abi.encodePacked(type(UUPSProxy).creationCode, abi.encode(address(controller), data));
         proxy = factory.deploy(salt, creationCode);

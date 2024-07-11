@@ -4,7 +4,7 @@ pragma solidity ^0.8.13;
 import {Script, console} from "forge-std/Script.sol";
 import {ICREATE3Factory} from "./ICREATE3Factory.sol";
 import {TokenController} from "src/TokenController.sol";
-import {UUPSProxy} from "src/UUPSProxy.sol";
+import {UUPSProxy} from "src/base/UUPSProxy.sol";
 
 contract DeployController is Script {
     address admin = 0x95e3664633A8650CaCD2c80A0F04fb56F65DF300;
@@ -26,7 +26,7 @@ contract DeployController is Script {
         controller = new TokenController(realLZEndpoint);
         bytes memory data = abi.encodeWithSelector(TokenController.initialize.selector, _deployer);
 
-        bytes32 salt = keccak256(bytes("real.Controller"));
+        bytes32 salt = keccak256(bytes("real.Controller.v1"));
         bytes memory creationCode =
             abi.encodePacked(type(UUPSProxy).creationCode, abi.encode(address(controller), data));
         proxy = factory.deploy(salt, creationCode);

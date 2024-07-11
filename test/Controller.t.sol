@@ -2,11 +2,13 @@
 pragma solidity =0.8.21;
 
 import {Test, console2 as console} from "forge-std/Test.sol";
+import {UUPSProxy} from "src/base/UUPSProxy.sol";
+import {BaseAppUpgradeable} from "src/base/BaseAppUpgradeable.sol";
 import {TokenController} from "src/TokenController.sol";
-import {RealToken} from "src/RealToken.sol";
+import {RealToken} from "src/token/RealToken.sol";
+import {TokenControllerMock} from "./mock/TokenControllerMock.sol";
 
-import {UUPSProxy} from "src/UUPSProxy.sol";
-
+import {IMock} from "./mock/IMock.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 contract ControllerTest is Test {
@@ -46,6 +48,21 @@ contract ControllerTest is Test {
         vm.stopPrank();
     }
 
+    /// @notice Upgrade as admin; make sure it works as expected
+    function testUpgradeAsAdmin() public {
+        // Pre-upgrade check
+        vm.expectRevert();
+        assertEq(IMock(address(controllerProxy)).mockTest(), false);
+
+        vm.startPrank(admin.addr);
+        TokenControllerMock v2 = new TokenControllerMock(unrealEndpoint);
+        controllerProxy.upgradeToAndCall(address(v2), "");
+
+        // Post-upgrade check
+        // Make sure new function exists
+        assertEq(IMock(address(controllerProxy)).mockTest(), true);
+    }
+
     function test_TokenName() public view {
         assertEq(usdc.name(), "USD Coin");
         assertEq(usdc.symbol(), "USDC.e");
@@ -60,7 +77,7 @@ contract ControllerTest is Test {
         uint256 bridgeAmount = 100_000_000;
         deal(address(usdc), alice.addr, bridgeAmount);
         deal(alice.addr, 2 ether);
-        vm.expectRevert(TokenController.TokenNotAllowed.selector);
+        vm.expectRevert(BaseAppUpgradeable.TokenNotAllowed.selector);
         controllerProxy.bridgeToken{value: 0.1 ether}(remoteChainId, usdt, bridgeAmount, "");
         vm.stopPrank();
     }

@@ -4,7 +4,7 @@ pragma solidity ^0.8.13;
 import {Script, console} from "forge-std/Script.sol";
 import {ICREATE3Factory} from "./ICREATE3Factory.sol";
 import {Vault} from "src/Vault.sol";
-import {UUPSProxy} from "src/UUPSProxy.sol";
+import {UUPSProxy} from "src/base/UUPSProxy.sol";
 
 contract DeployVault is Script {
     address admin = 0x95e3664633A8650CaCD2c80A0F04fb56F65DF300;
@@ -29,9 +29,7 @@ contract DeployVault is Script {
         vault = new Vault(vaultLZEndpoint, realLZChainId);
         bytes memory data = abi.encodeWithSelector(Vault.initialize.selector, _deployer);
 
-        console.logBytes(data);
-
-        bytes32 salt = keccak256(bytes("real.Vault"));
+        bytes32 salt = keccak256(bytes("real.Vault.v1"));
         bytes memory creationCode = abi.encodePacked(type(UUPSProxy).creationCode, abi.encode(address(vault), data));
         proxy = factory.deploy(salt, creationCode);
     }

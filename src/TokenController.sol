@@ -2,62 +2,27 @@
 pragma solidity =0.8.21;
 
 import {UUPSUpgradeable} from "openzeppelin-contracts-upgradeable/contracts/proxy/utils/UUPSUpgradeable.sol";
-import {ReentrancyGuardUpgradeable} from
-    "openzeppelin-contracts-upgradeable/contracts/utils/ReentrancyGuardUpgradeable.sol";
-import {NonblockingLzAppUpgradeable} from "@tangible/layerzero/lzApp/NonblockingLzAppUpgradeable.sol";
-
+import {BaseAppUpgradeable} from "src/base/BaseAppUpgradeable.sol";
 import {IMintableERC20} from "src/interfaces/IMintableERC20.sol";
-import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
-contract TokenController is UUPSUpgradeable, ReentrancyGuardUpgradeable, NonblockingLzAppUpgradeable {
-    using SafeERC20 for IERC20;
-
-    /// @custom:storage-location erc7201:real.storage.Controller
-    struct ControllerStorage {
-        bool paused;
-        bytes defaultAdapterParams;
-        mapping(address => bool) whitelisted;
-    }
-
-    // keccak256(abi.encode(uint256(keccak256("real.storage.Controller")) - 1)) & ~bytes32(uint256(0xff))
-    bytes32 private constant ControllerStorageLocation =
-        0xa42e995bc2ea3f08c0d30976851f7745a056162abe03e339fd26a9a9c58a5a00;
-
-    function _getControllerStorage() private pure returns (ControllerStorage storage $) {
-        // slither-disable-next-line assembly
-        assembly {
-            $.slot := ControllerStorageLocation
-        }
-    }
-
-    /// @notice This event is emitted to set the whitelisted token
-    event Whitelisted(address indexed srcToken, bool isWhitelisted);
-    event BridgeToken(address indexed token, uint256 amount);
-    event TokenClaimed(uint16 indexed srcId, address indexed token, address receiver, uint256 amount);
-    event Paused(bool isPaused);
-
-    error ZeroAddress();
-    error TokenNotAllowed();
-    error IsPaused();
-
+/**
+ * @title TokenController
+ * @dev A contract for managing token operations with upgradeable functionality.
+ */
+contract TokenController is UUPSUpgradeable, BaseAppUpgradeable {
     /**
      * @param endpoint The endpoint for Layer Zero operations.
      * @custom:oz-upgrades-unsafe-allow constructor
      */
-    constructor(address endpoint) NonblockingLzAppUpgradeable(endpoint) {}
+    constructor(address endpoint) BaseAppUpgradeable(endpoint) {}
 
     /**
-     * @notice Vault initializer
-     * @param intialOwner The admin address
+     * @notice Initializes the controller with the initial owner.
+     * @param initialOwner The admin address.
      */
-    function initialize(address intialOwner) external initializer {
+    function initialize(address initialOwner) external initializer {
         __UUPSUpgradeable_init();
-        __ReentrancyGuard_init();
-        __NonblockingLzApp_init(intialOwner);
-
-        ControllerStorage storage $ = _getControllerStorage();
-        $.defaultAdapterParams = abi.encodePacked(uint16(1), uint256(200_000)); //set layerZero adapter params for native fees
+        __BaseApp_init(initialOwner);
     }
 
     /**
@@ -67,84 +32,64 @@ contract TokenController is UUPSUpgradeable, ReentrancyGuardUpgradeable, Nonbloc
     function _authorizeUpgrade(address v) internal override onlyOwner {}
 
     /**
-     * @dev Modifier to make a function callable only when the contract is paused.
-     *
-     * Requirements:
-     *
-     * - The contract must not be paused.
+     * @notice Adds a token to the whitelist.
+     * @param token The address of the token to whitelist.
+     * @dev Only callable by the owner. Reverts if the token address is zero.
      */
-    modifier whenNotPaused() {
-        ControllerStorage storage $ = _getControllerStorage();
-        if ($.paused) revert IsPaused();
-        _;
+    function setWhitelistToken(address token) external onlyOwner {
+        if (token == address(0)) revert ZeroAddress();
+        _updateWhitelistToken(token, true);
     }
 
     /**
-     * @dev Triggers stopped state.
-     *
-     * Requirements:
-     *
-     * - The contract must not be paused.
+     * @notice Removes a token from the whitelist.
+     * @param token The address of the token to remove from the whitelist.
+     * @dev Only callable by the owner. Reverts if the token address is zero.
      */
-    function togglePause() external onlyOwner {
-        ControllerStorage storage $ = _getControllerStorage();
-        bool state = $.paused;
-        $.paused = !state;
-        emit Paused(state);
-    }
-
-    function setWhitelistToken(address token) external onlyOwner {
-        if (token == address(0)) revert ZeroAddress();
-
-        ControllerStorage storage $ = _getControllerStorage();
-        $.whitelisted[token] = true;
-        emit Whitelisted(token, true);
-    }
-
     function removeWhitelistToken(address token) external onlyOwner {
         if (token == address(0)) revert ZeroAddress();
-
-        ControllerStorage storage $ = _getControllerStorage();
-        $.whitelisted[token] = false;
-        emit Whitelisted(token, false);
+        _updateWhitelistToken(token, false);
     }
 
-    /// @dev Internal function to handle incoming Ping messages.
-    /// @param _srcChainId The source chain ID from which the message originated.
-    /// @param _payload The payload of the incoming message.
-    function _nonblockingLzReceive(
-        uint16 _srcChainId,
-        bytes memory, /*_srcAddress*/
-        uint64, /*_nonce*/
-        bytes memory _payload
-    ) internal override whenNotPaused {
-        // decode the token transfer payload
-        (address token, address recipient, uint256 amount) = abi.decode(_payload, (address, address, uint256));
+    // ==================== INTERNAL ====================
 
-        ControllerStorage storage $ = _getControllerStorage();
-        if (!$.whitelisted[token]) revert TokenNotAllowed();
+    /**
+     * @dev Internal function to handle token sending across chains.
+     * @param dstChainId The destination chain ID.
+     * @param token The address of the mainChain token to burn.
+     * @param amount The amount of the token to send.
+     * @param _adapterParams Adapter parameters for the Layer Zero send function.
+     */
+    function _send(uint16 dstChainId, address token, uint256 amount, bytes memory _adapterParams) internal override {
+        // burn token from user
+        IMintableERC20(token).burn(_msgSender(), amount);
+
+        bytes memory _payload = abi.encode(token, _msgSender(), amount);
+        _lzSend(dstChainId, _payload, payable(_msgSender()), address(0x0), _adapterParams, msg.value);
+    }
+
+    /**
+     * @dev Internal function to handle token receiving.
+     * @param token The address of the mainchain token received.
+     * @param recipient The address of the recipient.
+     * @param amount The amount of the token received.
+     * @return The address of the token received.
+     */
+    function _receive(address token, address recipient, uint256 amount) internal override returns (address) {
+        if (token == address(0) || !isWhitelistedToken(token)) revert TokenNotAllowed();
 
         // mint token to recipient's account
         IMintableERC20(token).mint(recipient, amount);
 
-        emit TokenClaimed(_srcChainId, token, recipient, amount);
+        return token;
     }
 
-    function bridgeToken(uint16 dstChainId, address l2Token, uint256 amount, bytes memory _adapterParams)
-        external
-        payable
-        whenNotPaused
-    {
-        ControllerStorage storage $ = _getControllerStorage();
-        if (!$.whitelisted[l2Token]) revert TokenNotAllowed();
-
-        // burn token from user
-        IMintableERC20(l2Token).burn(_msgSender(), amount);
-
-        // send lz message
-        bytes memory _payload = abi.encode(l2Token, _msgSender(), amount);
-        _adapterParams = _adapterParams.length != 0 ? _adapterParams : $.defaultAdapterParams;
-        _lzSend(dstChainId, _payload, payable(_msgSender()), address(0x0), _adapterParams, msg.value);
-        emit BridgeToken(l2Token, amount);
+    /**
+     * @dev Internal function to get the main chain token address.
+     * @param token The address of the mainchain token.
+     * @return The address of the main chain token.
+     */
+    function _getMainChainToken(address token) internal pure override returns (address) {
+        return token;
     }
 }

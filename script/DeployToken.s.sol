@@ -3,7 +3,7 @@ pragma solidity ^0.8.13;
 
 import {Script, console} from "forge-std/Script.sol";
 import {ICREATE3Factory} from "./ICREATE3Factory.sol";
-import {RealToken} from "src/RealToken.sol";
+import {RealToken} from "src/token/RealToken.sol";
 
 contract DeployToken is Script {
     address admin = 0x95e3664633A8650CaCD2c80A0F04fb56F65DF300;

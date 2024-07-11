@@ -6,6 +6,10 @@ import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "@openzeppelin/contracts/access/Ownable2Step.sol";
 import "@openzeppelin/contracts/token/ERC20/extensions/ERC20Permit.sol";
 
+/**
+ * @title RealToken
+ * @dev ERC20 token with minting and burning capabilities, controllable by a designated controller.
+ */
 contract RealToken is ERC20, ERC20Permit, Ownable2Step {
     uint8 private immutable _decimals;
     address public controller;
@@ -17,10 +21,17 @@ contract RealToken is ERC20, ERC20Permit, Ownable2Step {
      */
     error ConrollereUnauthorizedAccount(address account);
 
-    constructor(address intialOwner, string memory name_, string memory symbol_, uint8 decimals_)
+    /**
+     * @notice Constructor for the RealToken contract.
+     * @param intialOwner_ The address of the initial owner.
+     * @param name_ The name of the token.
+     * @param symbol_ The symbol of the token.
+     * @param decimals_ The number of decimals for the token.
+     */
+    constructor(address intialOwner_, string memory name_, string memory symbol_, uint8 decimals_)
         ERC20(name_, symbol_)
         ERC20Permit(name_)
-        Ownable(intialOwner)
+        Ownable(intialOwner_)
     {
         _decimals = decimals_;
     }
@@ -33,12 +44,21 @@ contract RealToken is ERC20, ERC20Permit, Ownable2Step {
         _;
     }
 
+    /**
+     * @dev Internal function to check if the caller is the controller.
+     * Reverts if the caller is not the controller.
+     */
     function _checkController() internal view {
         if (controller != _msgSender()) {
             revert ConrollereUnauthorizedAccount(_msgSender());
         }
     }
 
+    /**
+     * @notice Sets a new controller for the contract.
+     * @param _controller The address of the new controller.
+     * @dev Only callable by the owner.
+     */
     function setController(address _controller) external onlyOwner {
         emit UpdateController(controller, _controller);
         controller = _controller;
@@ -61,10 +81,22 @@ contract RealToken is ERC20, ERC20Permit, Ownable2Step {
         return _decimals;
     }
 
+    /**
+     * @notice Burns tokens from a specified address.
+     * @param user_ The address to burn tokens from.
+     * @param amount_ The amount of tokens to burn.
+     * @dev Only callable by the controller.
+     */
     function burn(address user_, uint256 amount_) external onlyController {
         _burn(user_, amount_);
     }
 
+    /**
+     * @notice Mints new tokens to a specified address.
+     * @param receiver_ The address to receive the minted tokens.
+     * @param amount_ The amount of tokens to mint.
+     * @dev Only callable by the controller.
+     */
     function mint(address receiver_, uint256 amount_) external onlyController {
         _mint(receiver_, amount_);
     }

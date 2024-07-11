@@ -2,9 +2,12 @@
 pragma solidity =0.8.21;
 
 import {Test, console2 as console} from "forge-std/Test.sol";
+import {UUPSProxy} from "src/base/UUPSProxy.sol";
+import {BaseAppUpgradeable} from "src/base/BaseAppUpgradeable.sol";
 import {Vault} from "src/Vault.sol";
-import {UUPSProxy} from "src/UUPSProxy.sol";
+import {VaultMock} from "./mock/VaultMock.sol";
 
+import {IMock} from "./mock/IMock.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 contract VaultTest is Test {
@@ -44,13 +47,28 @@ contract VaultTest is Test {
         vm.stopPrank();
     }
 
+    /// @notice Upgrade as admin; make sure it works as expected
+    function testUpgradeAsAdmin() public {
+        // Pre-upgrade check
+        vm.expectRevert();
+        assertEq(IMock(address(vaultProxy)).mockTest(), false);
+
+        vm.startPrank(admin.addr);
+        VaultMock v2 = new VaultMock(arbEndPoint, remoteChainId);
+        vaultProxy.upgradeToAndCall(address(v2), "");
+
+        // Post-upgrade check
+        // Make sure new function exists
+        assertEq(IMock(address(vaultProxy)).mockTest(), true);
+    }
+
     function test_FailBridgeToken() public {
         vm.startPrank(alice.addr);
         uint256 bridgeAmount = 100_000_000;
         deal(usdt, alice.addr, bridgeAmount);
         deal(alice.addr, 2 ether);
-        vm.expectRevert(Vault.TokenNotAllowed.selector);
-        vaultProxy.bridgeToken{value: 0.1 ether}(usdt, bridgeAmount, "0x");
+        vm.expectRevert(BaseAppUpgradeable.TokenNotAllowed.selector);
+        vaultProxy.bridgeToken{value: 0.1 ether}(1, usdt, bridgeAmount, "0x");
         vm.stopPrank();
     }
 
@@ -63,7 +81,7 @@ contract VaultTest is Test {
         assertEq(IERC20(usdc).balanceOf(alice.addr), bridgeAmount);
 
         IERC20(usdc).approve(address(vaultProxy), bridgeAmount);
-        vaultProxy.bridgeToken{value: 0.1 ether}(usdc, bridgeAmount, "");
+        vaultProxy.bridgeToken{value: 0.1 ether}(1, usdc, bridgeAmount, "");
         vm.stopPrank();
         assertEq(IERC20(usdc).balanceOf(alice.addr), 0);
     }

@@ -6,8 +6,8 @@ import {ICREATE3Factory} from "./ICREATE3Factory.sol";
 import {RealToken} from "src/token/RealToken.sol";
 
 contract DeployToken is Script {
-    address admin = 0x95e3664633A8650CaCD2c80A0F04fb56F65DF300;
-    address controller = 0x8B63F11141D998D45A50D6c7A51db217C2481E25;
+    address admin = 0xeB658c4Ea908aC4dAF9c309D8f883d6aD758b3A3;
+    address controller = 0x7dfe5d23761B7a748e962003e0FC6b4559afED39;
 
     address _deployer;
 

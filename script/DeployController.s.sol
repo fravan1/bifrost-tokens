@@ -7,8 +7,8 @@ import {TokenController} from "src/TokenController.sol";
 import {UUPSProxy} from "src/base/UUPSProxy.sol";
 
 contract DeployController is Script {
-    address admin = 0x95e3664633A8650CaCD2c80A0F04fb56F65DF300;
-    address realLZEndpoint = 0x83c73Da98cf733B03315aFa8758834b36a195b87;
+    address admin = 0xeB658c4Ea908aC4dAF9c309D8f883d6aD758b3A3;
+    address realLZEndpoint = 0xb6319cC6c8c27A8F5dAF0dD3DF91EA35C4720dd7;
     address _deployer;
     TokenController controller;
 
@@ -25,6 +25,8 @@ contract DeployController is Script {
 
         controller = new TokenController(realLZEndpoint);
         bytes memory data = abi.encodeWithSelector(TokenController.initialize.selector, _deployer);
+
+        console.logBytes(data);
 
         bytes32 salt = keccak256(bytes("real.bridge.controller"));
         bytes memory creationCode =

@@ -148,4 +148,53 @@ contract VaultTest is Test {
         vm.stopPrank();
         assertEq(IERC20(usdc).balanceOf(alice.addr), bridgeAmount);
     }
+
+    function test_WhitelistTokenFail() public {
+        vm.startPrank(alice.addr);
+        vm.expectRevert();
+        vaultProxy.setWhitelistToken(usdt, l2Usdc);
+        vm.stopPrank();
+    }
+
+    function test_togglePauseFail() public {
+        vm.startPrank(alice.addr);
+        vm.expectRevert();
+        vaultProxy.togglePause();
+        vm.stopPrank();
+    }
+
+    function test_BridgeTokenFailIsPaused() public {
+        vm.startPrank(admin.addr);
+        vaultProxy.togglePause();
+        vm.stopPrank();
+
+        vm.startPrank(alice.addr);
+        uint256 bridgeAmount = 100_000_000;
+        deal(usdc, alice.addr, bridgeAmount);
+        deal(alice.addr, 2 ether);
+
+        assertEq(IERC20(usdc).balanceOf(alice.addr), bridgeAmount);
+
+        IERC20(usdc).approve(address(vaultProxy), bridgeAmount);
+        vm.expectRevert(BaseAppUpgradeable.IsPaused.selector);
+        vaultProxy.bridgeToken{value: 0.1 ether}(1, usdc, bridgeAmount, "");
+        vm.stopPrank();
+    }
+
+    function test_LZReceiveIsPaused() public {
+        vm.startPrank(admin.addr);
+        vaultProxy.togglePause();
+        vm.stopPrank();
+
+        uint256 bridgeAmount = 100_000_000;
+        deal(usdc, address(vaultProxy), bridgeAmount);
+        bytes memory _srcAddress = abi.encodePacked(address(vaultProxy), l2Controller);
+        bytes memory _payload = abi.encode(usdc, alice.addr, bridgeAmount);
+
+        vm.startPrank(arbEndPoint);
+        vaultProxy.lzReceive(remoteChainId, _srcAddress, 1, _payload);
+        vm.stopPrank();
+        bytes32 msg0x;
+        assertNotEq(vaultProxy.failedMessages(remoteChainId, _srcAddress, 1), msg0x);
+    }
 }

@@ -8,7 +8,7 @@ import {UUPSProxy} from "src/base/UUPSProxy.sol";
 
 contract DeployVault is Script {
     address admin = 0xeB658c4Ea908aC4dAF9c309D8f883d6aD758b3A3;
-    address vaultLZEndpoint = 0x3c2269811836af69497E5F486A85D7316753cf62;
+    address vaultLZEndpoint = 0xb6319cC6c8c27A8F5dAF0dD3DF91EA35C4720dd7;
     uint16 realLZChainId = 237;
 
     address _deployer;
@@ -27,10 +27,8 @@ contract DeployVault is Script {
         require(msg.sender == _deployer, "!deployer");
 
         vault = new Vault(vaultLZEndpoint, realLZChainId);
+
         bytes memory data = abi.encodeWithSelector(Vault.initialize.selector, _deployer);
-
-        console.logBytes(data);
-
         bytes32 salt = keccak256(bytes("real.bridge.vault"));
         bytes memory creationCode = abi.encodePacked(type(UUPSProxy).creationCode, abi.encode(address(vault), data));
         proxy = factory.deploy(salt, creationCode);

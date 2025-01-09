@@ -28,7 +28,7 @@ contract VaultTest is Test {
     Vault vaultProxy;
 
     function setUp() public {
-        vm.createSelectFork(ARBITRUM_SEPOLIA_RPC_URL, 61_813_940);
+        vm.createSelectFork(ARBITRUM_SEPOLIA_RPC_URL, 112_359_429);
 
         admin = makeAccount("admin");
         alice = makeAccount("alice");

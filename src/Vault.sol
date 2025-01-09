@@ -98,17 +98,21 @@ contract Vault is UUPSUpgradeable, BaseAppUpgradeable {
      * @dev Internal function to handle token sending across chains.
      *
      * @param srcToken The address of the source token.
+     * @param to The address of the recipient.
      * @param amount The amount of the token to send.
      * @param _adapterParams Adapter parameters for the Layer Zero send function.
      */
-    function _send(uint16, address srcToken, uint256 amount, bytes memory _adapterParams) internal override {
+    function _send(uint16, address srcToken, address to, uint256 amount, bytes memory _adapterParams)
+        internal
+        override
+    {
         amount = _safeTransferFrom(srcToken, _msgSender(), address(this), amount);
 
         if (amount == 0) revert InvalidAmount();
 
         VaultStorage storage $ = _getVaultStorage();
         address _mainChainToken = $.tokenPairs[srcToken];
-        bytes memory _payload = abi.encode(_mainChainToken, _msgSender(), amount);
+        bytes memory _payload = abi.encode(_mainChainToken, to, amount);
 
         _lzSend(dstChainId, _payload, payable(_msgSender()), address(0x0), _adapterParams, msg.value);
     }

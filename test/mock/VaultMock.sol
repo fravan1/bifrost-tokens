@@ -53,7 +53,7 @@ contract VaultMock is UUPSUpgradeable, BaseAppUpgradeable {
 
     function _getMainChainToken(address token) internal view override returns (address) {}
 
-    function _send(uint16 _dstChainId, address _token, uint256 _amount, bytes memory _adapterParams)
+    function _send(uint16 _dstChainId, address _token, address _to, uint256 _amount, bytes memory _adapterParams)
         internal
         override
     {}

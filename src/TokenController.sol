@@ -57,14 +57,18 @@ contract TokenController is UUPSUpgradeable, BaseAppUpgradeable {
      * @dev Internal function to handle token sending across chains.
      * @param dstChainId The destination chain ID.
      * @param token The address of the mainChain token to burn.
+     * @param to The address of the recipient.
      * @param amount The amount of the token to send.
      * @param _adapterParams Adapter parameters for the Layer Zero send function.
      */
-    function _send(uint16 dstChainId, address token, uint256 amount, bytes memory _adapterParams) internal override {
+    function _send(uint16 dstChainId, address token, address to, uint256 amount, bytes memory _adapterParams)
+        internal
+        override
+    {
         // burn token from user
         IMintableERC20(token).burn(_msgSender(), amount);
 
-        bytes memory _payload = abi.encode(token, _msgSender(), amount);
+        bytes memory _payload = abi.encode(token, to, amount);
         _lzSend(dstChainId, _payload, payable(_msgSender()), address(0x0), _adapterParams, msg.value);
     }
 

@@ -114,17 +114,25 @@ abstract contract BaseAppUpgradeable is ReentrancyGuardUpgradeable, OwnableUpgra
         nonReentrant
         whenNotPaused
     {
-        if (token == address(0)) revert ZeroAddress();
-        if (amount == 0) revert InvalidParam();
+        _bridgeToken(_dstChainId, token, _msgSender(), amount, _adapterParams);
+    }
 
-        BaseAppStorage storage $ = _getBaseAppStorage();
-        if (!$.whitelisted[token]) revert TokenNotAllowed();
-
-        _adapterParams = _adapterParams.length != 0 ? _adapterParams : $.defaultAdapterParams;
-
-        _send(_dstChainId, token, amount, _adapterParams);
-
-        emit BridgeToken(token, amount);
+    /**
+     * @notice Bridges tokens to another chain.
+     * @param _dstChainId The destination chain ID.
+     * @param token The address of the source token.
+     * @param to The address of the recipient.
+     * @param amount The amount of the token to bridge.
+     * @param _adapterParams Adapter parameters for the LayerZero send function.
+     * @dev Callable by external accounts. Reverts if the contract is paused, the token is not whitelisted, or if any parameter is invalid.
+     */
+    function bridgeTokenTo(uint16 _dstChainId, address token, address to, uint256 amount, bytes memory _adapterParams)
+        external
+        payable
+        nonReentrant
+        whenNotPaused
+    {
+        _bridgeToken(_dstChainId, token, to, amount, _adapterParams);
     }
 
     /**
@@ -186,14 +194,31 @@ abstract contract BaseAppUpgradeable is ReentrancyGuardUpgradeable, OwnableUpgra
         received = IERC20(token).balanceOf(to) - balanceBefore;
     }
 
+    function _bridgeToken(uint16 _dstChainId, address _token, address _to, uint256 _amount, bytes memory _adapterParams)
+        internal
+    {
+        if (_token == address(0)) revert ZeroAddress();
+        if (_amount == 0) revert InvalidParam();
+
+        BaseAppStorage storage $ = _getBaseAppStorage();
+        if (!$.whitelisted[_token]) revert TokenNotAllowed();
+
+        _adapterParams = _adapterParams.length != 0 ? _adapterParams : $.defaultAdapterParams;
+
+        _send(_dstChainId, _token, _to, _amount, _adapterParams);
+
+        emit BridgeToken(_token, _amount);
+    }
+
     /**
      * @dev Internal function to handle token sending across chains.
      * @param _dstChainId The destination chain ID.
      * @param _srcToken The address of the chain token to send / burn.
+     * @param _to The address of the recipient.
      * @param _amount The amount of the token to send.
      * @param _adapterParams Adapter parameters for the LayerZero send function.
      */
-    function _send(uint16 _dstChainId, address _srcToken, uint256 _amount, bytes memory _adapterParams)
+    function _send(uint16 _dstChainId, address _srcToken, address _to, uint256 _amount, bytes memory _adapterParams)
         internal
         virtual;
 
@@ -229,12 +254,13 @@ abstract contract BaseAppUpgradeable is ReentrancyGuardUpgradeable, OwnableUpgra
      * @notice Estimates the fees for bridging tokens.
      * @param dstChainId The destination chain ID.
      * @param token The address of the source token.
+     * @param to The address of the recipient.
      * @param amount The amount of the token to bridge.
      * @param _adapterParams Adapter parameters for the LayerZero send function.
      * @return nativeFee The native fee for the operation.
      * @return zroFee The ZRO fee for the operation.
      */
-    function estimateFees(uint16 dstChainId, address token, uint256 amount, bytes memory _adapterParams)
+    function estimateFees(uint16 dstChainId, address token, address to, uint256 amount, bytes memory _adapterParams)
         public
         view
         returns (uint256 nativeFee, uint256 zroFee)
@@ -244,7 +270,7 @@ abstract contract BaseAppUpgradeable is ReentrancyGuardUpgradeable, OwnableUpgra
         address mainChainToken = _getMainChainToken(token);
         if (mainChainToken == address(0)) revert ZeroAddress();
 
-        bytes memory _payload = abi.encode(mainChainToken, _msgSender(), amount);
+        bytes memory _payload = abi.encode(mainChainToken, to, amount);
         _adapterParams = _adapterParams.length != 0 ? _adapterParams : $.defaultAdapterParams;
 
         return lzEndpoint.estimateFees(dstChainId, address(this), _payload, false, _adapterParams);

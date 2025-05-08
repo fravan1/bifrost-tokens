@@ -1,6 +1,17 @@
 [profile.default]
-src = "src"
-out = "out"
-libs = ["lib"]
+solc = "0.8.21"
+evm_version = "shanghai"
+optimizer = true
+optimizer_runs = 200
+
+
+remappings = [
+  "src/=src/",
+  "forge-std/=lib/forge-std/src/",
+  "@tangible/=lib/tangible-foundation-contracts/src/",
+]
+
+[fmt]
+number_underscore="thousands"
 
 # See more config options https://github.com/foundry-rs/foundry/blob/master/crates/config/README.md#all-options

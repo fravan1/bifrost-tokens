@@ -1,19 +1,24 @@
-## Foundry
+## Bifrost Tokens
 
-**Foundry is a blazing fast, portable and modular toolkit for Ethereum application development written in Rust.**
+Bifrost ERC20 Tokens: Real's cross-chain erc20 Bridge using LayerZero
 
-Foundry consists of:
+#### Vault
 
--   **Forge**: Ethereum testing framework (like Truffle, Hardhat and DappTools).
--   **Cast**: Swiss army knife for interacting with EVM smart contracts, sending transactions and getting chain data.
--   **Anvil**: Local Ethereum node, akin to Ganache, Hardhat Network.
--   **Chisel**: Fast, utilitarian, and verbose solidity REPL.
+The Vault locks tokens on the source chain and sends a message to the token controller on the destination chain to mint corresponding tokens.
 
-## Documentation
+#### Controller
 
-https://book.getfoundry.sh/
+The Controller manages the minting and burning of tokens on the destination chain.
 
 ## Usage
+
+To effectively use Bifrost, follow these steps:
+
+Add Trusted Remote Address: Configure trusted addresses for both the Vault and Controller corresponding to the respective chain IDs.
+
+Whitelist Token Addresses: Ensure that the source token (srcToken) and destination token (dstToken) addresses are whitelisted in the Vault.
+
+Configure L2 Token Address: Whitelist the Layer 2 (L2) token address in the Controller.
 
 ### Build
 
@@ -48,7 +53,7 @@ $ anvil
 ### Deploy
 
 ```shell
-$ forge script script/Counter.s.sol:CounterScript --rpc-url <your_rpc_url> --private-key <your_private_key>
+$ forge script script/DeployVault.s.sol:DeployVault --rpc-url <your_rpc_url> --private-key <your_private_key>
 ```
 
 ### Cast

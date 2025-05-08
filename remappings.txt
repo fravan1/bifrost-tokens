@@ -1,0 +1,13 @@
+src/=src/
+forge-std/=lib/forge-std/src/
+@tangible/=lib/tangible-foundation-contracts/src/
+@layerzerolabs/contracts-upgradeable/=lib/tangible-foundation-contracts/src/layerzero/
+@layerzerolabs/contracts/=lib/tangible-foundation-contracts/lib/layerzerolabs/contracts/
+@openzeppelin/contracts-upgradeable/=lib/tangible-foundation-contracts/lib/openzeppelin-contracts-upgradeable/contracts/
+@openzeppelin/contracts/=lib/tangible-foundation-contracts/lib/openzeppelin-contracts-upgradeable/lib/openzeppelin-contracts/contracts/
+ds-test/=lib/tangible-foundation-contracts/lib/forge-std/lib/ds-test/src/
+erc4626-tests/=lib/tangible-foundation-contracts/lib/openzeppelin-contracts-upgradeable/lib/erc4626-tests/
+layerzerolabs/=lib/tangible-foundation-contracts/lib/layerzerolabs/contracts/
+openzeppelin-contracts-upgradeable/=lib/tangible-foundation-contracts/lib/openzeppelin-contracts-upgradeable/
+openzeppelin-contracts/=lib/tangible-foundation-contracts/lib/openzeppelin-contracts-upgradeable/lib/openzeppelin-contracts/
+tangible-foundation-contracts/=lib/tangible-foundation-contracts/src/
